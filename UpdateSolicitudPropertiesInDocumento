@@ -1,0 +1,482 @@
+'Actualizacion de solicitudes relacionadas a documentos
+'12/11/2021 - Luis Gonzalez - Arkiva Mexico
+
+Option Explicit
+
+'Declaracion de objetos
+Dim ot_Solicitud : ot_Solicitud = Vault.ObjectTypeOperations.GetObjectTypeIDByAlias("OT.Solicitud")
+Dim ot_AreaInvolucrada : ot_AreaInvolucrada = Vault.ObjectTypeOperations.GetObjectTypeIDByAlias("OT.ReaInvolucrada")
+Dim ot_ParteInvolucrada : ot_ParteInvolucrada = Vault.ObjectTypeOperations.GetObjectTypeIDByAlias("OT.ParteInvolucrada")
+Const ot_Documento = 0
+
+'Declaracion de clases
+Dim cl_Solicitud : cl_Solicitud = Vault.ClassOperations.GetObjectClassIDByAlias("CL.Solicitud")
+Dim cl_Documento : cl_Documento = Vault.ClassOperations.GetObjectClassIDByAlias("CL.Documento")
+Dim cl_OtroDocumento : cl_OtroDocumento = Vault.ClassOperations.GetObjectClassIDByAlias("CL.OtroDocumento")
+Dim cl_AreaInvolucrada : cl_AreaInvolucrada = Vault.ClassOperations.GetObjectClassIDByAlias("CL.AreaInvolucrada")
+Dim cl_ParteInvolucrada : cl_ParteInvolucrada = Vault.ClassOperations.GetObjectClassIDByAlias("CL.ParteInvolucrada")
+
+'Declaracion de propiedades generales
+Dim pd_TipoDocumento : pd_TipoDocumento = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("P.D.Tipodedocumento")
+Dim pd_NumeroSolicitud : pd_NumeroSolicitud = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.NmeroDeSolicitud")
+Dim pd_Solicitud : pd_Solicitud = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.Solicitud")
+
+'Declaracion de propiedades - Otros documentos
+Dim pd_FechaDocumento : pd_FechaDocumento = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.FechaDelDocumento")
+Dim pd_DescripcionCorta : pd_DescripcionCorta = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.DescripcionCorta")
+Dim pd_TipoDocumentoOtrosDocumentos : pd_TipoDocumentoOtrosDocumentos = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.TipoDeDocumentoOtrosDocumentos")
+
+'Declaracion de propiedades - Contratos
+Dim pd_TipoDeContrato : pd_TipoDeContrato = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.TipoDeContrato")
+Dim pd_FechaVigencia : pd_FechaVigencia = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.Fecha de Vigencia")
+Dim pd_FechaVigenciaFinContrato : pd_FechaVigenciaFinContrato = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.FechaVigenciaFinDelContrato")
+Dim pd_DescripcionGeneral : pd_DescripcionGeneral = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.DescripcionGeneral")
+Dim pd_ContratoIntercompanias : pd_ContratoIntercompanias = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.ContratoIntercompaas")
+Dim pd_Monto : pd_Monto = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.Monto")
+Dim pd_Moneda : pd_Moneda = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.Moneda")
+Dim pd_TipoDeRegistro : pd_TipoDeRegistro = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.TipoDeRegistro")
+
+'Declaracion de propiedades - Secretaria Corporativa (ACTA)
+Dim pd_TipoDeActaContrata : pd_TipoDeActaContrata = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.TipoDeActaContrata")
+Dim pd_TipoSolicitud : pd_TipoSolicitud = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.TipoDeSolicitud")
+
+'Declaracion de propiedades compartidas (Contratos y Secretaria Corporativa (ACTA))
+Dim pd_AsesorJurdicoAsignado : pd_AsesorJurdicoAsignado = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.AsesorJurdicoAsignado")
+Dim pd_NombreSolicitante : pd_NombreSolicitante = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.NombreDelSolicitante")
+Dim pd_ResponsableArea : pd_ResponsableArea = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.ResponsableArea")
+Dim pd_NombreArea : pd_NombreArea = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.NombreDeAreaInvolucrada")
+Dim pd_Participante : pd_Participante = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.Participantesi")
+Dim pd_ParticipaComo : pd_ParticipaComo = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.ParticipaComo")
+
+'Declaracion de variables locales
+Dim oObjVerIDDocumento, oObjVerDocumento, oObjID, szTipoDocumento, iClassId, dataTypeValue, szNumeroSolicitud, oObjVerIDSolicitud
+Dim dFechaDocumento, szDescripcionCorta, szTipoDocumentoOtrosDocumentos, iTipoSolicitud, szDescripcionGeneral, iTipoContrato, bContratoIntercompanias, dFechaVigencia, dFechaVigenciaFinContrato,szMonto, iMoneda, iAsesorJurdicoAsignado, iTipoDeRegistro, iTipoDeActaContrata, iNombreSolicitante
+Dim iResponsableArea, szNombreArea, iParticipante, szParticipaComo
+
+'Inicializa objetos de M-Files
+Dim oPropertyValuesDocumento : Set oPropertyValuesDocumento = CreateObject( "MFilesAPI.PropertyValues" )
+Dim oPropertyValues : Set oPropertyValues = CreateObject( "MFilesAPI.PropertyValues" )
+Set oPropertyValues = Vault.ObjectPropertyOperations.GetProperties( ObjVer )
+Dim i_class : i_class = oPropertyValues.SearchForProperty( MFBuiltInPropertyDefClass ).TypedValue.GetLookupID
+
+'ArrayList de clases
+Dim oClassIdsArrayList : Set oClassIdsArrayList = CreateObject( "System.Collections.ArrayList" )
+oClassIdsArrayList.Add cl_Documento
+oClassIdsArrayList.Add cl_OtroDocumento
+
+If i_class = cl_Solicitud Then    
+
+    For Each iClassId In oClassIdsArrayList
+
+        'Buscar y obtener el ObjVerID del documento relacionado a la solicitud
+        oObjVerIDDocumento = ObtenerObjVerIDPorTipoObjeto(iClassId, pd_Solicitud, ObjVer.ID, "Lookups")
+
+        If oObjVerIDDocumento > 0 Then
+
+            Set oObjID = CreateObject( "MFilesAPI.ObjID" )
+            Call oObjID.SetIDs(ot_Documento, oObjVerIDDocumento)
+            Set oObjVerDocumento = Vault.ObjectOperations.GetLatestObjVer(oObjID, true)
+            
+            Set oPropertyValuesDocumento = Vault.ObjectPropertyOperations.GetProperties( oObjVerDocumento )
+
+            szTipoDocumento = oPropertyValuesDocumento.SearchForPropertyEx(pd_TipoDocumento, true).TypedValue.GetValueAsLocalizedText()
+
+            If szTipoDocumento = "Otros documentos" Then
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_FechaDocumento, true).TypedValue.IsNULL() Then                    
+                    dFechaDocumento = oPropertyValues.SearchForPropertyEx(pd_FechaDocumento, true).TypedValue.Value                       
+                    
+                    If dFechaDocumento > 0 Then
+                        dataTypeValue = "Date"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_FechaDocumento, dFechaDocumento
+                    End If                    
+                End If
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_DescripcionCorta, true).TypedValue.IsNULL() Then
+                    szDescripcionCorta = oPropertyValues.SearchForPropertyEx(pd_DescripcionCorta, true).TypedValue.GetValueAsLocalizedText()                
+                    
+                    If Not szDescripcionCorta = "" Then
+                        dataTypeValue = "MultiLineText"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_DescripcionCorta, szDescripcionCorta
+                    End If
+                End If
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_TipoDocumentoOtrosDocumentos, true).TypedValue.IsNULL() Then
+                    szTipoDocumentoOtrosDocumentos = oPropertyValues.SearchForPropertyEx(pd_TipoDocumentoOtrosDocumentos, true).TypedValue.GetValueAsLocalizedText()                
+                    
+                    If Not szTipoDocumentoOtrosDocumentos = "" Then
+                        dataTypeValue = "Text"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_TipoDocumentoOtrosDocumentos, szTipoDocumentoOtrosDocumentos
+                    End If
+                End If
+
+            End If
+
+            If szTipoDocumento = "Contrato" Then
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_DescripcionGeneral, true).TypedValue.IsNULL() Then
+                    szDescripcionGeneral = oPropertyValues.SearchForPropertyEx(pd_DescripcionGeneral, true).TypedValue.GetValueAsLocalizedText()               
+                    
+                    If Not szDescripcionGeneral = "" Then
+                        dataTypeValue = "MultiLineText"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_DescripcionGeneral, szDescripcionGeneral
+                    End If
+                End If
+                
+                If Not oPropertyValues.SearchForPropertyEx(pd_TipoDeContrato, true).TypedValue.IsNULL() Then
+                    iTipoContrato = oPropertyValues.SearchForPropertyEx(pd_TipoDeContrato, true).TypedValue.GetValueAsLookup.Item               
+                    
+                    If iTipoContrato > 0 Then
+                        dataTypeValue = "Lookup"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_TipoDeContrato, iTipoContrato
+                    End If
+                End If
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_FechaVigencia, true).TypedValue.IsNULL() Then
+                    dFechaVigencia = oPropertyValues.SearchForPropertyEx(pd_FechaVigencia, true).TypedValue.Value                
+                    
+                    If dFechaVigencia > 0 Then
+                        dataTypeValue = "Date"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_FechaVigencia, dFechaVigencia
+                    End If
+                End If
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_FechaVigenciaFinContrato, true).TypedValue.IsNULL() Then
+                    dFechaVigenciaFinContrato = oPropertyValues.SearchForPropertyEx(pd_FechaVigenciaFinContrato, true).TypedValue.Value                
+                    
+                    If dFechaVigenciaFinContrato > 0 Then
+                        dataTypeValue = "Date"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_FechaVigenciaFinContrato, dFechaVigenciaFinContrato
+                    End If
+                End If
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_Monto, true).TypedValue.IsNULL() Then
+                    szMonto = oPropertyValues.SearchForPropertyEx(pd_Monto, true).TypedValue.GetValueAsLocalizedText()               
+                    
+                    If Not szMonto = "" Then
+                        dataTypeValue = "Floating"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_Monto, szMonto
+                    End If
+                End If
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_Moneda, true).TypedValue.IsNULL() Then
+                    iMoneda = oPropertyValues.SearchForPropertyEx(pd_Moneda, true).TypedValue.GetValueAsLookup.Item               
+                    
+                    If iMoneda > 0 Then
+                        dataTypeValue = "Lookup"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_Moneda, iMoneda
+                    End If
+                End If                
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_TipoDeRegistro, true).TypedValue.IsNULL() Then
+                    iTipoDeRegistro = oPropertyValues.SearchForPropertyEx(pd_TipoDeRegistro, true).TypedValue.GetValueAsLookup.Item               
+                    
+                    If iTipoDeRegistro > 0 Then
+                        dataTypeValue = "Lookup"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_TipoDeRegistro, iTipoDeRegistro
+                    End If
+                End If
+
+            End If
+
+            If szTipoDocumento = "Secretaría Corporativa" Then
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_TipoDeActaContrata, true).TypedValue.IsNULL() Then
+                    iTipoDeActaContrata = oPropertyValues.SearchForPropertyEx(pd_TipoDeActaContrata, true).TypedValue.GetValueAsLookup.Item               
+                    
+                    If iTipoDeActaContrata > 0 Then
+                        dataTypeValue = "Lookup"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_TipoDeActaContrata, iTipoDeActaContrata
+                    End If
+                End If
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_TipoSolicitud, true).TypedValue.IsNULL() Then
+                    iTipoSolicitud = oPropertyValues.SearchForPropertyEx(pd_TipoSolicitud, true).TypedValue.GetValueAsLookup.Item               
+                    
+                    If iTipoSolicitud > 0 Then
+                        dataTypeValue = "Lookup"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_TipoSolicitud, iTipoSolicitud
+                    End If
+                End If
+
+            End If
+
+            If szTipoDocumento = "Contrato" Or szTipoDocumento = "Secretaría Corporativa" Then
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_AsesorJurdicoAsignado, true).TypedValue.IsNULL() Then
+                    iAsesorJurdicoAsignado = oPropertyValues.SearchForPropertyEx(pd_AsesorJurdicoAsignado, true).TypedValue.GetValueAsLookup.Item               
+                    
+                    If iAsesorJurdicoAsignado > 0 Then
+                        dataTypeValue = "Lookup"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_AsesorJurdicoAsignado, iAsesorJurdicoAsignado
+                    End If
+                End If
+
+                If Not oPropertyValues.SearchForPropertyEx(pd_NombreSolicitante, true).TypedValue.IsNULL() Then
+                    iNombreSolicitante = oPropertyValues.SearchForPropertyEx(pd_NombreSolicitante, true).TypedValue.GetValueAsLookup.Item               
+                    
+                    If iNombreSolicitante > 0 Then
+                        dataTypeValue = "Lookup"
+                        HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_NombreSolicitante, iNombreSolicitante
+                    End If
+                End If
+
+                '////////////// Seccion para heredar campos de Areas y Partes Involucradas //////////////
+                'Propiedades de areas y partes involucradas
+                Dim oObjVerIDAreaInvolucrada, oObjVerIDParteInvolucrada, oObjVerAreaInvolucrada, oObjVerParteInvolucrada, oObjIDAI, oObjIDPI                
+
+                'Obtener ObjVerID de area involucrada
+                oObjVerIDAreaInvolucrada = ObtenerObjVerIDPorTipoObjeto(cl_AreaInvolucrada, pd_Solicitud, ObjVer.ID, "Lookups")
+                
+                If oObjVerIDAreaInvolucrada > 0 Then
+                    
+                    Set oObjIDAI = CreateObject( "MFilesAPI.ObjID" )
+                    Call oObjIDAI.SetIDs(ot_AreaInvolucrada, oObjVerIDAreaInvolucrada)
+                    Set oObjVerAreaInvolucrada = Vault.ObjectOperations.GetLatestObjVer(oObjIDAI, true)
+
+                    Dim oPropertyValuesAI : Set oPropertyValuesAI = CreateObject( "MFilesAPI.PropertyValues" )
+                    Set oPropertyValuesAI = Vault.ObjectPropertyOperations.GetProperties( oObjVerAreaInvolucrada )
+
+                    If Not oPropertyValuesAI.SearchForPropertyEx(pd_ResponsableArea, true).TypedValue.IsNULL() Then
+                        iResponsableArea = oPropertyValuesAI.SearchForPropertyEx(pd_ResponsableArea, true).TypedValue.GetValueAsLookup.Item               
+                        
+                        If iResponsableArea > 0 Then
+                            dataTypeValue = "Lookup"
+                            HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_ResponsableArea, iResponsableArea
+                        End If
+                    End If
+
+                    If Not oPropertyValuesAI.SearchForPropertyEx(pd_NombreArea, true).TypedValue.IsNULL() Then
+                        szNombreArea = oPropertyValuesAI.SearchForPropertyEx(pd_NombreArea, true).TypedValue.GetValueAsLocalizedText()                
+                        
+                        If Not szNombreArea = "" Then
+                            dataTypeValue = "Text"
+                            HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_NombreArea, szNombreArea
+                        End If
+                    End If
+
+                End If
+
+                'Obtener ObjVerID de parte involucrada
+                oObjVerIDParteInvolucrada = ObtenerObjVerIDPorTipoObjeto(cl_ParteInvolucrada, pd_Solicitud, ObjVer.ID, "Lookups")
+
+                If oObjVerIDParteInvolucrada > 0 Then
+
+                    Set oObjIDPI = CreateObject( "MFilesAPI.ObjID" )
+                    Call oObjIDPI.SetIDs(ot_ParteInvolucrada, oObjVerIDParteInvolucrada)
+                    Set oObjVerParteInvolucrada = Vault.ObjectOperations.GetLatestObjVer(oObjIDPI, true)
+
+                    Dim oPropertyValuesPI : Set oPropertyValuesPI = CreateObject( "MFilesAPI.PropertyValues" )
+                    Set oPropertyValuesPI = Vault.ObjectPropertyOperations.GetProperties( oObjVerParteInvolucrada )
+
+                    If Not oPropertyValuesPI.SearchForPropertyEx(pd_Participante, true).TypedValue.IsNULL() Then
+                        iParticipante = oPropertyValuesPI.SearchForPropertyEx(pd_Participante, true).TypedValue.GetValueAsLookup.Item               
+                        
+                        If iParticipante > 0 Then                            
+                            dataTypeValue = "Lookup"
+                            HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_Participante, iParticipante
+                        End If
+                    End If
+
+                    If Not oPropertyValuesPI.SearchForPropertyEx(pd_ParticipaComo, true).TypedValue.IsNULL() Then
+                        szParticipaComo = oPropertyValuesPI.SearchForPropertyEx(pd_ParticipaComo, true).TypedValue.GetValueAsLocalizedText()                
+                        
+                        If Not szParticipaComo = "" Then
+                            dataTypeValue = "Text"
+                            HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_ParticipaComo, szParticipaComo
+                        End If
+                    End If
+
+                End If
+
+            End If
+
+        End If
+
+    Next 
+
+End If
+
+If i_class = cl_AreaInvolucrada Then
+
+    szNumeroSolicitud = oPropertyValues.SearchForPropertyEx(pd_Solicitud, true).TypedValue.GetValueAsLocalizedText()
+
+    'Obtener la version de objeto de la solicitud procesada
+    oObjVerIDSolicitud = ObtenerObjVerIDPorTipoObjeto(cl_Solicitud, pd_NumeroSolicitud, szNumeroSolicitud, "Text")
+
+    If oObjVerIDSolicitud > 0 Then
+
+        For Each iClassId In oClassIdsArrayList
+
+            'Buscar y obtener el ObjVerID del documento relacionado a la solicitud
+            oObjVerIDDocumento = ObtenerObjVerIDPorTipoObjeto(iClassId, pd_Solicitud, oObjVerIDSolicitud, "Lookups")
+
+            If oObjVerIDDocumento > 0 Then
+
+                Set oObjID = CreateObject( "MFilesAPI.ObjID" )
+                Call oObjID.SetIDs(ot_Documento, oObjVerIDDocumento)
+                Set oObjVerDocumento = Vault.ObjectOperations.GetLatestObjVer(oObjID, true)
+
+                Set oPropertyValuesDocumento = Vault.ObjectPropertyOperations.GetProperties( oObjVerDocumento )
+
+                szTipoDocumento = oPropertyValuesDocumento.SearchForPropertyEx(pd_TipoDocumento, true).TypedValue.GetValueAsLocalizedText()
+
+                If szTipoDocumento = "Contrato" Or szTipoDocumento = "Secretaría Corporativa" Then
+
+                    If Not oPropertyValues.SearchForPropertyEx(pd_ResponsableArea, true).TypedValue.IsNULL() Then
+                        iResponsableArea = oPropertyValues.SearchForPropertyEx(pd_ResponsableArea, true).TypedValue.GetValueAsLookup.Item               
+                        
+                        If iResponsableArea > 0 Then
+                            dataTypeValue = "Lookup"
+                            HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_ResponsableArea, iResponsableArea
+                        End If
+                    End If
+
+                    If Not oPropertyValues.SearchForPropertyEx(pd_NombreArea, true).TypedValue.IsNULL() Then
+                        szNombreArea = oPropertyValues.SearchForPropertyEx(pd_NombreArea, true).TypedValue.GetValueAsLocalizedText()                
+                        
+                        If Not szNombreArea = "" Then
+                            dataTypeValue = "Text"
+                            HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_NombreArea, szNombreArea
+                        End If
+                    End If
+
+                End If
+
+            End If
+
+        Next
+
+    End If    
+
+End If
+
+If i_class = cl_ParteInvolucrada Then
+
+    szNumeroSolicitud = oPropertyValues.SearchForPropertyEx(pd_Solicitud, true).TypedValue.GetValueAsLocalizedText()
+
+    'Obtener la version de objeto de la solicitud procesada
+    oObjVerIDSolicitud = ObtenerObjVerIDPorTipoObjeto(cl_Solicitud, pd_NumeroSolicitud, szNumeroSolicitud, "Text")
+
+    If oObjVerIDSolicitud > 0 Then
+
+        For Each iClassId In oClassIdsArrayList
+
+            'Buscar y obtener el ObjVerID del documento relacionado a la solicitud
+            oObjVerIDDocumento = ObtenerObjVerIDPorTipoObjeto(iClassId, pd_Solicitud, oObjVerIDSolicitud, "Lookups")
+
+            If oObjVerIDDocumento > 0 Then
+
+                Set oObjID = CreateObject( "MFilesAPI.ObjID" )
+                Call oObjID.SetIDs(ot_Documento, oObjVerIDDocumento)
+                Set oObjVerDocumento = Vault.ObjectOperations.GetLatestObjVer(oObjID, true)
+
+                Set oPropertyValuesDocumento = Vault.ObjectPropertyOperations.GetProperties( oObjVerDocumento )
+
+                szTipoDocumento = oPropertyValuesDocumento.SearchForPropertyEx(pd_TipoDocumento, true).TypedValue.GetValueAsLocalizedText()
+
+                If szTipoDocumento = "Contrato" Or szTipoDocumento = "Secretaría Corporativa" Then
+
+                    If Not oPropertyValues.SearchForPropertyEx(pd_Participante, true).TypedValue.IsNULL() Then
+                        iParticipante = oPropertyValues.SearchForPropertyEx(pd_Participante, true).TypedValue.GetValueAsLookup.Item               
+                        
+                        If iParticipante > 0 Then            
+                            dataTypeValue = "Lookup"
+                            HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_Participante, iParticipante
+                        End If
+                    End If
+
+                    If Not oPropertyValues.SearchForPropertyEx(pd_ParticipaComo, true).TypedValue.IsNULL() Then
+                        szParticipaComo = oPropertyValues.SearchForPropertyEx(pd_ParticipaComo, true).TypedValue.GetValueAsLocalizedText()                
+                        
+                        If Not szParticipaComo = "" Then
+                            dataTypeValue = "Text"
+                            HeredarPropiedadesDeSolicitudContrataADocumento oObjVerIDDocumento, dataTypeValue, pd_ParticipaComo, szParticipaComo
+                        End If
+                    End If
+
+                End If
+
+            End If
+
+        Next
+
+    End If    
+    
+End If
+
+Function ObtenerObjVerIDPorTipoObjeto(iClase, iPropertyDef, xPropertyDefValue, szTipoBusqueda)
+
+    Dim oResults
+
+    'Buscar la solicitud
+    Dim oSCs : Set oSCs = CreateObject( "MFilesAPI.SearchConditions" )
+    Dim oSC : Set oSC = CreateObject( "MFilesAPI.SearchCondition" )
+
+    'Crea los filtros de búsqueda
+    'Clase
+    oSC.ConditionType = MFConditionTypeEqual
+    oSC.Expression.DataPropertyValuePropertyDef = MFBuiltInPropertyDefClass
+    oSC.TypedValue.SetValue MFDatatypeLookup, iClase
+    oSCs.Add -1, oSC    
+
+    'Propiedad
+    If szTipoBusqueda = "Lookups" Then
+        oSC.ConditionType = MFConditionTypeEqual
+        oSC.Expression.DataPropertyValuePropertyDef = iPropertyDef
+        oSC.TypedValue.SetValue MFDatatypeMultiSelectLookup, xPropertyDefValue
+        oSCs.Add -1, oSC
+    Else 'Text
+        oSC.ConditionType = MFConditionTypeEqual
+        oSC.Expression.DataPropertyValuePropertyDef = iPropertyDef
+        oSC.TypedValue.SetValue MFDatatypeText, xPropertyDefValue
+        oSCs.Add -1, oSC
+    End If
+
+    'No eliminado
+    oSc.ConditionType = MFConditionTypeEqual
+    oSc.Expression.DataStatusValueType = MFStatusTypeDeleted
+    oSc.TypedValue.SetValue MFDatatypeBoolean, False
+    oScs.Add -1, oSc
+    
+    'Ejecutar la busqueda
+    Set oResults = Vault.ObjectSearchOperations.SearchForObjectsByConditions(oScs, MFSearchFlagNone, False)
+
+    If oResults.Count > 0 Then
+
+        ObtenerObjVerIDPorTipoObjeto = oResults(1).ObjVer.ID
+
+    End If
+
+End Function
+
+Sub HeredarPropiedadesDeSolicitudContrataADocumento(ByRef oObjIdDocumento, dataTypeValue, iPropertyDef, propertyDefValue)
+    
+    Dim oObjID : Set oObjID = CreateObject( "MFilesAPI.ObjID" )
+    Call oObjID.SetIDs(MFilesAPI.MFBuiltInObjectType.MFBuiltInObjectTypeDocument, oObjIdDocumento)
+    Dim oObjVer : Set oObjVer = Vault.ObjectOperations.GetLatestObjVer(oObjID, true)
+
+    Dim oPropertyValue: Set oPropertyValue = CreateObject( "MFilesAPI.PropertyValue" )
+    oPropertyValue.PropertyDef = iPropertyDef
+    
+    If dataTypeValue = "Text" Then
+        oPropertyValue.TypedValue.SetValue MFDatatypeText, propertyDefValue
+    ElseIf dataTypeValue = "MultiLineText" Then
+        oPropertyValue.TypedValue.SetValue MFDatatypeMultiLineText, propertyDefValue
+    ElseIf dataTypeValue = "Floating" Then
+        oPropertyValue.TypedValue.SetValue MFDatatypeFloating, propertyDefValue
+    ElseIf dataTypeValue = "Date" Then
+        oPropertyValue.TypedValue.SetValue MFDatatypeDate, propertyDefValue
+    ElseIf dataTypeValue = "Boolean" Then
+        oPropertyValue.TypedValue.SetValue MFDatatypeBoolean, propertyDefValue
+    ElseIf dataTypeValue = "Lookup" Then
+        oPropertyValue.TypedValue.SetValue MFDatatypeLookup, propertyDefValue
+    ElseIf dataTypeValue = "Lookups" Then
+        oPropertyValue.TypedValue.SetValueToMultiSelectLookup propertyDefValue
+    End If    
+
+    Set oObjVer = Vault.ObjectOperations.CheckOut(oObjID).ObjVer 
+    Vault.ObjectPropertyOperations.SetProperty oObjVer, oPropertyValue
+    Vault.ObjectOperations.CheckIn(oObjVer)
+
+End Sub
