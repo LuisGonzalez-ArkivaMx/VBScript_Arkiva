@@ -1,0 +1,300 @@
+' Definicion: Codigo que crea el objeto Proveedor o Cliente en M-Files validando el RFC del CFDI descargado del SAT
+' Tipo de Evento: BeforeCreateNewObjectFinalize
+' Autor: Luis Gonzalez / Arkiva Mexico
+' Fecha creacion: 29 de Agosto 2022
+' Modifico: --
+' Fecha modificacion: --
+
+Option Explicit
+
+'Declara las variables locales   
+Dim sRfcValue, sNombreValue, sUuidValue
+
+'Inicializa clases y propiedades de la boveda fiscal
+Dim ot_Proveedor : ot_Proveedor = Vault.ObjectTypeOperations.GetObjectTypeIDByAlias("OT.Proveedor")
+Dim ot_EmpresaInterna : ot_EmpresaInterna = Vault.ObjectTypeOperations.GetObjectTypeIDByAlias("OT.EmpresaInterna")
+Dim ot_Cliente : ot_Cliente = Vault.ObjectTypeOperations.GetObjectTypeIDByAlias("OT.Cliente")
+Dim cl_ComprobanteRecibido : cl_ComprobanteRecibido = Vault.ClassOperations.GetObjectClassIDByAlias("Arkiva.Class.CFDIComprobanteRecibido")
+Dim cl_ComprobanteEmitido : cl_ComprobanteEmitido = Vault.ClassOperations.GetObjectClassIDByAlias("Arkiva.Class.CFDIComprobanteEmitido")
+Dim cl_Proveedor : cl_Proveedor = Vault.ClassOperations.GetObjectClassIDByAlias("CL.Proveedor")
+Dim cl_EmpresaInterna : cl_EmpresaInterna = Vault.ClassOperations.GetObjectClassIDByAlias("CL.EmpresaInterna")
+Dim cl_Cliente : cl_Cliente = Vault.ClassOperations.GetObjectClassIDByAlias("CL.Cliente")
+Dim cl_ConceptoCFDI : cl_ConceptoCFDI = Vault.ClassOperations.GetObjectClassIDByAlias("Arkiva.Class.ConceptoDeCFDI")
+Dim cl_ComplementoPagoEmitido : cl_ComplementoPagoEmitido = Vault.ClassOperations.GetObjectClassIDByAlias("Arkiva.Class.CFDIComplementoPagoEmitido")
+Dim cl_ComplementoPagoRecibido : cl_ComplementoPagoRecibido = Vault.ClassOperations.GetObjectClassIDByAlias("Arkiva.Class.CFDIComplementoPagoRecibido")
+Dim pd_RfcEmpresa : pd_RfcEmpresa = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.RfcEmpresa")
+Dim pd_RfcEmisor : pd_RfcEmisor = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("CFDI.RFCEmisor.Texto")
+Dim pd_NombreEmisor : pd_NombreEmisor = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("CFDI.EmisorCFDI.Texto")
+Dim pd_RfcReceptor : pd_RfcReceptor = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("CFDI.RFCReceptor.Texto")
+Dim pd_NombreReceptor : pd_NombreReceptor = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("CFDI.ReceptorCFDI.Texto")
+Dim pd_Proveedor : pd_Proveedor = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("MF.PD.Proveedor")
+Dim pd_EmpresaInterna : pd_EmpresaInterna = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.EmpresaInterna")
+Dim pd_Cliente : pd_Cliente = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("PD.Cliente")
+Dim pd_ConceptoCFDI : pd_ConceptoCFDI = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("CFDI.ConceptodeCFDI.Objeto")
+Dim pd_UUID : pd_UUID = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("CFDI.UUID.Texto")
+Dim pd_ComplementoPagoEmitido : pd_ComplementoPagoEmitido = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("CFDI.CFDIComplementoEmitido.Texto")
+Dim pd_ComplementoPagoRecibido : pd_ComplementoPagoRecibido = Vault.PropertyDefOperations.GetPropertyDefIDByAlias("CFDI.CFDIComplementoRecibido.Texto")
+
+'Inicializa objetos de M-Files
+Dim oPropertyValues : Set oPropertyValues = CreateObject( "MFilesAPI.PropertyValues" )
+Set oPropertyValues = Vault.ObjectPropertyOperations.GetProperties( ObjVer )
+Dim i_class : i_class = oPropertyValues.SearchForProperty( MFBuiltInPropertyDefClass ).TypedValue.GetLookupID
+
+If i_class = cl_ComprobanteRecibido Then 'Si es comprobante recibido
+
+    'Validaciones RFC Emisor  
+    sRfcValue = oPropertyValues.SearchForProperty( pd_RfcEmisor ).TypedValue.Value
+	sNombreValue = oPropertyValues.SearchForProperty( pd_NombreEmisor ).TypedValue.Value		
+
+    If Not sRfcValue = "" And Not sNombreValue = "" Then
+
+        'Si existe Rfc/Nombre, se busca Rfc en Organizacion, si no existe se crea y vincula al comprobante
+        If Not bValidateIfExistingObject( cl_Proveedor, pd_RfcEmpresa, sRfcValue ) Then
+						
+            CreatingNewObject ot_Proveedor, cl_Proveedor, pd_RfcEmpresa, sRfcValue, sNombreValue  			
+
+        End If				
+	
+		'Vincula Emisor de CFDI Recibido
+        SetBindingProperties cl_Proveedor, pd_RfcEmpresa, pd_Proveedor, sRfcValue, 2				
+    
+    ElseIf Not sRfcValue = "" And sNombreValue = "" Then
+
+        'Si no hay nombre emisor en CFDI, Solo se vincula Emisor de CFDI Recibido
+        SetBindingProperties cl_Proveedor, pd_RfcEmpresa, pd_Proveedor, sRfcValue, 2
+
+    End If
+
+    'Validaciones RFC Receptor
+    sRfcValue = oPropertyValues.SearchForProperty( pd_RfcReceptor ).TypedValue.Value
+	sNombreValue = oPropertyValues.SearchForProperty( pd_NombreReceptor ).TypedValue.Value
+
+    If Not sRfcValue = "" And Not sNombreValue = "" Then
+
+        If Not bValidateIfExistingObject( cl_EmpresaInterna, pd_RfcEmpresa, sRfcValue ) Then
+
+            CreatingNewObject ot_EmpresaInterna, cl_EmpresaInterna, pd_RfcEmpresa, sRfcValue, sNombreValue         
+
+        End If
+		
+		'Vincula Receptor de CFDI Recibido
+        SetBindingProperties cl_EmpresaInterna, pd_RfcEmpresa, pd_EmpresaInterna, sRfcValue, 2
+
+    ElseIf Not sRfcValue = "" And sNombreValue = "" Then
+        
+        SetBindingProperties cl_EmpresaInterna, pd_RfcEmpresa, pd_EmpresaInterna, sRfcValue, 2
+
+    End If
+
+    'Vincula los conceptos de CFDI y complementos de pago con el comprobante recibido
+    sUuidValue = oPropertyValues.SearchForProperty( pd_UUID ).TypedValue.Value
+
+    If Not sUuidValue = "" Then
+
+        SetBindingProperties cl_ConceptoCFDI, pd_UUID, pd_ConceptoCFDI, sUuidValue, 2
+        SetBindingProperties cl_ComplementoPagoEmitido, pd_UUID, pd_ComplementoPagoEmitido, sUuidValue, 2
+    
+    End If
+
+End If
+
+If i_class = cl_ComprobanteEmitido Then 'Si es comprobante emitido
+  
+    'Validaciones de RFC Receptor
+    sRfcValue = oPropertyValues.SearchForProperty( pd_RfcReceptor ).TypedValue.Value
+	sNombreValue = oPropertyValues.SearchForProperty( pd_NombreReceptor ).TypedValue.Value
+
+    If Not sRfcValue = "" And Not sNombreValue = "" Then
+
+        If Not bValidateIfExistingObject( cl_Cliente, pd_RfcEmpresa, sRfcValue ) Then
+
+            CreatingNewObject ot_Cliente, cl_Cliente, pd_RfcEmpresa, sRfcValue, sNombreValue          
+
+        End If
+
+        SetBindingProperties cl_Cliente, pd_RfcEmpresa, pd_Cliente, sRfcValue, 2					
+    
+    ElseIf Not sRfcValue = "" And sNombreValue = "" Then
+
+        SetBindingProperties cl_Cliente, pd_RfcEmpresa, pd_Cliente, sRfcValue, 2
+
+    End If
+
+    'Validaciones de RFC Emisor   
+    sRfcValue = oPropertyValues.SearchForProperty( pd_RfcEmisor ).TypedValue.Value
+	sNombreValue = oPropertyValues.SearchForProperty( pd_NombreEmisor ).TypedValue.Value
+
+    If Not sRfcValue = "" And Not sNombreValue = "" Then
+
+        If Not bValidateIfExistingObject( cl_EmpresaInterna, pd_RfcEmpresa, sRfcValue ) Then
+
+            CreatingNewObject ot_EmpresaInterna, cl_EmpresaInterna, pd_RfcEmpresa, sRfcValue, sNombreValue           
+
+        End If
+
+        SetBindingProperties cl_EmpresaInterna, pd_RfcEmpresa, pd_EmpresaInterna, sRfcValue, 2
+    
+    ElseIf Not sRfcValue = "" And sNombreValue = "" Then
+
+        SetBindingProperties cl_EmpresaInterna, pd_RfcEmpresa, pd_EmpresaInterna, sRfcValue, 2
+        
+    End If
+
+    'Vincula los conceptos de CFDI y complementos de pago con el comprobante emitido
+    sUuidValue = oPropertyValues.SearchForProperty( pd_UUID ).TypedValue.Value
+
+    If Not sUuidValue = "" Then
+
+        SetBindingProperties cl_ConceptoCFDI, pd_UUID, pd_ConceptoCFDI, sUuidValue, 2
+        SetBindingProperties cl_ComplementoPagoRecibido, pd_UUID, pd_ComplementoPagoRecibido, sUuidValue, 2
+    
+    End If
+
+End If
+
+'Buscar en organizacion si existe rfc importado
+Function bValidateIfExistingObject ( iClass, iRfcOrgProp, sRfcValue )
+
+    Dim oSCs : Set oSCs = CreateObject( "MFilesAPI.SearchConditions" )
+    Dim oSC : Set oSC = CreateObject( "MFilesAPI.SearchCondition" )
+    Dim bExist : bExist = False
+
+    'Crea filtro de búsqueda
+    'Clase = Proveedor / Sociedad - Interno
+    oSC.ConditionType = MFConditionTypeEqual
+    oSC.Expression.DataPropertyValuePropertyDef = MFBuiltInPropertyDefClass
+    oSC.TypedValue.SetValue MFDatatypeLookup, iClass
+    oSCs.Add -1, oSC
+
+    'Propiedad RFC
+    oSC.ConditionType = MFConditionTypeEqual
+    oSC.Expression.DataPropertyValuePropertyDef = iRfcOrgProp
+    oSC.TypedValue.SetValue MFDatatypeText, sRfcValue
+    oSCs.Add -1, oSC
+
+    'No eliminado
+    oSc.ConditionType = MFConditionTypeEqual
+    oSc.Expression.DataStatusValueType = MFStatusTypeDeleted
+    oSc.TypedValue.SetValue MFDatatypeBoolean, False
+    oScs.Add -1, oSc
+    
+    'Ejecuta la busqueda
+    Dim oResults
+    Set oResults = Vault.ObjectSearchOperations.SearchForObjectsByConditions( oScs, MFSearchFlagNone, False )
+    
+    If oResults.Count > 0 Then
+
+        'Si existe una organizacion con el rfc importado, bExist es true
+        'En caso contrario, bExist es false
+        bExist = True
+
+    End If
+
+    'Se establece resultado final
+    bValidateIfExistingObject = bExist
+        
+End Function
+
+'Subrutina que crea un nuevo objeto y agrega dos propiedades
+Sub CreatingNewObject ( ByRef iObject, iClass, iRfcOrgProp, sRfcValue, sNombreValue )
+	
+    'Crea objeto definicion de propiedades
+    Dim oPropertyValues : Set oPropertyValues = CreateObject( "MFilesAPI.PropertyValues" )
+    Set oPropertyValues = Vault.ObjectPropertyOperations.GetProperties( ObjVer )
+	
+    'Crea objetos de destino
+    Dim oPropVals : Set	oPropVals = CreateObject( "MFilesAPI.PropertyValues" )
+    Dim oPropVal : Set oPropVal = CreateObject( "MFilesAPI.PropertyValue" )
+    Dim oNewObjOrganizacion : Set oNewObjOrganizacion = CreateObject( "MFilesAPI.ObjectVersionAndProperties" )
+
+    'Clase del objeto
+    oPropVal.PropertyDef = MFBuiltInPropertyDefClass
+	oPropVal.TypedValue.SetValue MFilesAPI.MFDataType.MFDatatypeLookup, iClass
+	oPropVals.Add -1, oPropVal
+
+    'Agrega propiedad rfc
+    oPropVal.PropertyDef = iRfcOrgProp
+    oPropVal.TypedValue.SetValue MFilesAPI.MFDataType.MFDatatypeText, sRfcValue
+    oPropVals.Add -1, oPropVal
+
+    'Agrega propiedad Nombre o titulo
+    oPropVal.PropertyDef = MFBuiltInPropertyDefNameOrTitle
+    oPropVal.TypedValue.SetValue MFilesAPI.MFDataType.MFDatatypeText, sNombreValue
+    oPropVals.Add -1, oPropVal
+    
+    'Crea nuevo objeto organizacion
+    Set oNewObjOrganizacion = Vault.ObjectOperations.CreateNewObject( iObject, oPropVals, Nothing, Nothing )
+
+    'CheckIn al nuevo objeto creado.
+    Vault.ObjectOperations.CheckIn( oNewObjOrganizacion.ObjVer )
+
+End Sub
+
+'Subrutina para vincular objectos
+Sub SetBindingProperties ( ByRef iClass, iPropertyToSearch, iPropertyDef, sValue, iListType )
+    
+    'List Type:
+    '-Simple-select = 1
+    '-Multi-select = 2
+
+    Dim oPropertyValues : Set oPropertyValues = CreateObject( "MFilesAPI.PropertyValues" )
+    Set oPropertyValues = Vault.ObjectPropertyOperations.GetProperties( ObjVer )
+    Dim oPropertyValue : Set oPropertyValue = CreateObject( "MFilesAPI.PropertyValue" )
+    Dim oLookups : Set oLookups = CreateObject( "MFilesAPI.Lookups" )
+    Dim oLookup : Set oLookup = CreateObject( "MFilesAPI.Lookup" )
+    Dim oResults, oResult
+
+	
+	Dim oSCs : Set oSCs = CreateObject( "MFilesAPI.SearchConditions" )
+	Dim oSC : Set oSC = CreateObject( "MFilesAPI.SearchCondition" )
+
+	'Crea los filtros de búsqueda
+	'Clase
+	oSC.ConditionType = MFConditionTypeEqual
+	oSC.Expression.DataPropertyValuePropertyDef = MFBuiltInPropertyDefClass
+	oSC.TypedValue.SetValue MFDatatypeLookup, iClass
+	oSCs.Add -1, oSC
+
+	'Propiedad
+	oSC.ConditionType = MFConditionTypeEqual
+	oSC.Expression.DataPropertyValuePropertyDef = iPropertyToSearch
+	oSC.TypedValue.SetValue MFDatatypeText, sValue
+	oSCs.Add -1, oSC
+
+	'No eliminado
+	oSc.ConditionType = MFConditionTypeEqual
+	oSc.Expression.DataStatusValueType = MFStatusTypeDeleted
+	oSc.TypedValue.SetValue MFDatatypeBoolean, False
+	oScs.Add -1, oSc
+	
+	'Ejecuta la busqueda
+	Set oResults = Vault.ObjectSearchOperations.SearchForObjectsByConditions( oScs, MFSearchFlagNone, False )
+	
+	'Err.Raise MFSCriptCancel, "Se encontro: " & oResults.Count            
+	'Si se encuentra por lo menos un resultado, crea el vinculo entre objetos
+	If oResults.Count > 0 Then
+
+		If iListType = 2 Then 'Es seleccion multiple
+
+			For Each oResult In oResults                                                           
+
+				oLookup.Item = oResult.ObjVer.ID
+				oLookups.Add -1, oLookup
+
+			Next
+													
+			oPropertyValue.PropertyDef = iPropertyDef
+			oPropertyValue.TypedValue.SetValueToMultiSelectLookup oLookups
+			Vault.ObjectPropertyOperations.SetProperty ObjVer, oPropertyValue
+
+		Else 'Es seleccion simple
+
+			oPropertyValue.PropertyDef = iPropertyDef
+			oPropertyValue.TypedValue.SetValue MFDatatypeLookup, oResults( 1 ).ObjVer.ID
+			Vault.ObjectPropertyOperations.SetProperty ObjVer, oPropertyValue
+
+		End If                              
+
+	End If
+    
+End Sub
